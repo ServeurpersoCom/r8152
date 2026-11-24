@@ -55,4 +55,10 @@
 	usb_register_device_driver(drv, THIS_MODULE)
 #endif
 
+/*
+ * Mainline drivers carry no version, and DKMS only replaces a module whose
+ * version sorts above the in-tree one (v1.12.13 in v6.12).
+ */
+MODULE_VERSION("v7.4-rc4");
+
 #endif

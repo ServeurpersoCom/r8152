@@ -89,4 +89,5 @@ a 10G link.
 
 Copy `drivers/net/usb/r8152.c` from a newer kernel, keep the
 `#include "compat.h"` line, build, add a `compat.h` entry for each new API
-the compiler rejects, and bump `PACKAGE_VERSION` in `dkms.conf`.
+the compiler rejects, and bump both `PACKAGE_VERSION` in `dkms.conf` and
+`MODULE_VERSION` in `compat.h`.
