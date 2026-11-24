@@ -31,6 +31,8 @@
 #include <linux/usb/r8152.h>
 #include <net/gso.h>
 
+#include "compat.h"
+
 #define DRIVER_AUTHOR "Realtek linux nic maintainers <nic_swsd@realtek.com>"
 #define DRIVER_DESC "Realtek RTL8152/RTL8153 Based USB Ethernet Adapters"
 #define MODULENAME "r8152"
