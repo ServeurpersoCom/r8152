@@ -4,6 +4,11 @@ The Linux kernel's own `r8152` driver, packaged with DKMS for kernels that
 predate it, so that Realtek USB adapters up to the 10GbE RTL8159 run at full
 speed on Debian stable.
 
+> **Firmware not included.** Like the kernel itself, this repository ships
+> the driver only. The RTL8159 needs its PHY firmware for 10G, which you
+> build yourself from Realtek's driver source: see
+> [RTL8159 firmware](#rtl8159-firmware).
+
 | Chip    | Speed | USB ID      |
 |---------|-------|-------------|
 | RTL8152 | 100M  | `0bda:8152` |
@@ -30,6 +35,7 @@ power cut brings back. This repository runs the mainline driver instead.
 * `compat.h`: the kernel APIs the mainline driver uses that older kernels
   lack or spell differently, each guarded by the version that introduced it.
 * `Kbuild`, `Makefile`, `dkms.conf`: out-of-tree build and DKMS packaging.
+* `rtl8159-fw.py`: builds the RTL8159 firmware file from Realtek's source.
 
 ## Install
 
@@ -53,26 +59,53 @@ DKMS rebuilds the module for every new kernel.
 ## RTL8159 firmware
 
 The RTL8159 needs its PHY firmware for 10G; without it the link stops at 5G.
-The driver loads it from `/lib/firmware/rtl_nic/rtl8159-1.fw`, but that file
-is not in linux-firmware: the microcode only exists as the `ram17` array of
-Realtek's GPL driver source.
+The driver loads it from `/lib/firmware/rtl_nic/rtl8159-1.fw`, a separate
+file like any other device firmware, which the kernel does not ship.
 
+That file is in neither linux-firmware nor this repository. Realtek publishes
+the microcode only as the `ram17` array inside its GPL driver source, with no
+firmware license that would allow redistributing the binary on its own. So
+each user generates it locally from Realtek's source, with `rtl8159-fw.py`
+(Python 3, standard library only).
+
+1. Get Realtek's `r8152.c`, for example 2.22.1 as mirrored by bb-qq:
+
+   ```
+   wget https://raw.githubusercontent.com/bb-qq/r8152/generic/2.22.1/r8152.c -O realtek-r8152.c
+   ```
+
+2. Generate the firmware:
+
+   ```
+   ./rtl8159-fw.py realtek-r8152.c
+   ```
+
+   It prints the Realtek version, the PHY `code_ver` and the microcode size,
+   e.g. `Realtek v2.22.1, PHY code_ver 0x0022, 17376 bytes of microcode`.
+   From 2.22.1, `rtl8159-1.fw` has SHA-256
+   `3113cdf4bce6b8c8bdf8a2b78d2aa85234ae1a0ab4739b965da2405fb9dc5f66`.
+
+3. Install it:
+
+   ```
+   mkdir -p /lib/firmware/rtl_nic
+   cp rtl8159-1.fw /lib/firmware/rtl_nic/
+   ```
+
+4. If `r8152` is in your initramfs (`lsinitramfs /boot/initrd.img-$(uname -r) | grep r8152`),
+   rebuild it so the firmware goes in too:
+
+   ```
+   update-initramfs -u
+   ```
+
+The script follows the format of
 [rtlnic_fw](https://gitlab.com/koblitz-rtlnic/rtlnic_fw) by Birger Koblitz,
-author of the mainline RTL8159 support, builds the file from that array:
-
-1. Copy `ram17[]` from Realtek's `r8152.c` into `rtl_fw.c`.
-2. In `speedup_17`, set `.version` to that driver's `code_ver` for `ram17`
-   (`0x0022` for 2.22.1). The driver compares it with the version the chip
-   reports after loading, so it must match.
-3. Build and write the file, then install it:
-
-```
-gcc rtl_fw.c -o rtl_fw -lssl -lcrypto
-./rtl_fw -w 17
-cp rtl8159-1.fw /lib/firmware/rtl_nic/
-```
-
-`./rtl_fw rtl8159-1.fw` dumps a firmware file and checks its SHA-256.
+author of the mainline RTL8159 support: a SHA-256 checked header, one
+`PHY_SPEED_UP` block written at register `0x9a00`, and the `code_ver` that
+Realtek's driver pairs with `ram17`. The driver compares that version with
+the one the chip reports after loading, so it must come from the same
+source as the microcode.
 
 ## Check
 
